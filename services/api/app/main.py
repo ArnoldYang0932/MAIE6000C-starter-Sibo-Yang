@@ -63,8 +63,17 @@ def create_case_with_job(db: Session, payload: CaseCreate) -> tuple[Case, Job]:
     return case, job
 
 
-def list_cases(db: Session, limit: int) -> list[Case]:
-    stmt = select(Case).order_by(Case.created_at.desc()).limit(limit)
+def list_cases(
+    db: Session,
+    limit: int,
+    status: CaseStatus | None = None,
+) -> list[Case]:
+    stmt = select(Case)
+
+    if status is not None:
+        stmt = stmt.where(Case.status == status.value)
+
+    stmt = stmt.order_by(Case.created_at.desc()).limit(limit)
     return db.execute(stmt).scalars().all()
 
 
@@ -135,9 +144,11 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db)) -> CaseCreat
 @app.get("/cases", response_model=list[CaseRead])
 def read_cases(
     limit: int = Query(default=20, ge=1, le=100),
+    status: CaseStatus | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> list[CaseRead]:
-    return [CaseRead.model_validate(case) for case in list_cases(db, limit)]
+    cases = list_cases(db, limit, status)
+    return [CaseRead.model_validate(case) for case in cases]
 
 
 @app.get("/cases/{case_id}", response_model=CaseRead)
